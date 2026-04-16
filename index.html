@@ -61,14 +61,6 @@
     }
 
     .btn-secondary { background: #222; }
-
-    .wallet {
-      word-break: break-all;
-      background: #111;
-      padding: 10px;
-      border-radius: 8px;
-      font-size: 12px;
-    }
   </style>
 </head>
 
@@ -118,11 +110,11 @@
 <div id="clips"></div>
 
 <script>
-const API = "https://cliptic-backend.onrender.com"; // ✅ YOUR BACKEND
+const API = "https://cliptic-backend.onrender.com";
 
 let token = localStorage.getItem("token") || "";
 
-// FIX: GET ELEMENTS
+// ELEMENTS
 const emailInput = document.getElementById("email");
 const passwordInput = document.getElementById("password");
 const videoFile = document.getElementById("videoFile");
@@ -135,8 +127,12 @@ const preview = document.getElementById("preview");
 const userInfo = document.getElementById("userInfo");
 const paymentStatus = document.getElementById("paymentStatus");
 
-// INIT
-window.onload = () => {
+// ✅ WAKE SERVER + INIT
+window.onload = async () => {
+  try {
+    await fetch(API); // wake backend
+  } catch {}
+
   if (token) {
     showApp();
     loadUser();
@@ -144,15 +140,23 @@ window.onload = () => {
   }
 };
 
-// SAFE FETCH
-async function safeFetch(url, options = {}) {
+// ✅ SAFE FETCH WITH RETRY
+async function safeFetch(url, options = {}, retries = 2) {
   try {
     const res = await fetch(url, options);
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Error");
+
+    if (!res.ok) throw new Error(data.error || "Request failed");
+
     return data;
+
   } catch (err) {
-    throw new Error("⚠️ Backend not reachable / network error");
+    if (retries > 0) {
+      await new Promise(r => setTimeout(r, 3000));
+      return safeFetch(url, options, retries - 1);
+    }
+
+    throw new Error("⚠️ Server slow/waking up. Try again.");
   }
 }
 
@@ -191,6 +195,7 @@ async function login() {
     showApp();
     loadUser();
     loadClips();
+
   } catch (err) {
     alert(err.message);
   }
