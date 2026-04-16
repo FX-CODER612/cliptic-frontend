@@ -60,12 +60,7 @@
       max-width: 400px;
     }
 
-    .pro { color: gold; }
-    .free { color: #ccc; }
-    .low { color: red; }
-
     .btn-secondary { background: #222; }
-    .preview { margin-top: 10px; }
 
     .wallet {
       word-break: break-all;
@@ -98,7 +93,7 @@
 
   <input type="file" id="videoFile" onchange="previewVideo()"><br>
 
-  <video id="preview" class="preview" controls style="display:none;"></video>
+  <video id="preview" controls style="display:none;"></video>
 
   <br>
   Duration:
@@ -111,26 +106,10 @@
 </div>
 
 <div id="rechargeBox" class="box" style="display:none;">
-  <h2>💳 Upgrade to Pro</h2>
+  <h2>💳 Upgrade</h2>
 
-  <p>Free: Limited credits</p>
-  <p class="pro">Pro: Unlimited power ⚡</p>
-
-  <hr>
-
-  <h3>🏦 Bank Transfer</h3>
-  <p>OPay:<br>8061980928<br>Emmanuel Adamu</p>
-  <button onclick="requestRecharge('bank')">I Paid via Bank</button>
-
-  <hr>
-
-  <h3>🪙 Crypto (USDT - BNB)</h3>
-  <div class="wallet" id="wallet">
-    0x1F74A8DaA15C55471055B692c64d25511678Ab3f
-  </div>
-
-  <button onclick="copyWallet()">📋 Copy Address</button>
-  <button onclick="requestRecharge('crypto')">I Paid via Crypto</button>
+  <button onclick="requestRecharge('bank')">Bank Payment</button>
+  <button onclick="requestRecharge('crypto')">Crypto Payment</button>
 
   <p id="paymentStatus"></p>
 </div>
@@ -139,10 +118,24 @@
 <div id="clips"></div>
 
 <script>
-const API = "https://cliptic-backend.onrender.com";
+const API = "https://cliptic-backend.onrender.com"; // ✅ YOUR BACKEND
 
 let token = localStorage.getItem("token") || "";
 
+// FIX: GET ELEMENTS
+const emailInput = document.getElementById("email");
+const passwordInput = document.getElementById("password");
+const videoFile = document.getElementById("videoFile");
+const durationInput = document.getElementById("duration");
+const status = document.getElementById("status");
+const clips = document.getElementById("clips");
+const uploadBtn = document.getElementById("uploadBtn");
+const animBtn = document.getElementById("animBtn");
+const preview = document.getElementById("preview");
+const userInfo = document.getElementById("userInfo");
+const paymentStatus = document.getElementById("paymentStatus");
+
+// INIT
 window.onload = () => {
   if (token) {
     showApp();
@@ -151,23 +144,30 @@ window.onload = () => {
   }
 };
 
-async function handleResponse(res) {
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.error || "Something went wrong");
+// SAFE FETCH
+async function safeFetch(url, options = {}) {
+  try {
+    const res = await fetch(url, options);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error");
+    return data;
+  } catch (err) {
+    throw new Error("⚠️ Backend not reachable / network error");
   }
-  return data;
 }
 
+// AUTH
 async function register() {
   try {
-    const res = await fetch(API + '/register', {
+    const data = await safeFetch(API + '/register', {
       method: 'POST',
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: email.value, password: password.value })
+      body: JSON.stringify({
+        email: emailInput.value,
+        password: passwordInput.value
+      })
     });
 
-    const data = await handleResponse(res);
     alert(data.message);
   } catch (err) {
     alert(err.message);
@@ -176,13 +176,14 @@ async function register() {
 
 async function login() {
   try {
-    const res = await fetch(API + '/login', {
+    const data = await safeFetch(API + '/login', {
       method: 'POST',
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: email.value, password: password.value })
+      body: JSON.stringify({
+        email: emailInput.value,
+        password: passwordInput.value
+      })
     });
-
-    const data = await handleResponse(res);
 
     token = data.token;
     localStorage.setItem("token", token);
@@ -200,6 +201,7 @@ function logout() {
   location.reload();
 }
 
+// UI
 function showApp() {
   authBox.style.display = "none";
   uploadBox.style.display = "block";
@@ -207,24 +209,24 @@ function showApp() {
   rechargeBox.style.display = "block";
 }
 
+// USER
 async function loadUser() {
   try {
-    const res = await fetch(API + '/me', {
+    const user = await safeFetch(API + '/me', {
       headers: { Authorization: "Bearer " + token }
     });
 
-    const user = await handleResponse(res);
-
     userInfo.innerHTML = `
       📧 ${user.email}<br>
-      💰 Credits: <b>${user.credits}</b><br>
-      🚀 Plan: ${user.plan.toUpperCase()}
+      💰 Credits: ${user.credits}<br>
+      🚀 Plan: ${user.plan}
     `;
   } catch {
     logout();
   }
 }
 
+// VIDEO PREVIEW
 function previewVideo() {
   const file = videoFile.files[0];
   if (!file) return;
@@ -233,29 +235,29 @@ function previewVideo() {
   preview.style.display = "block";
 }
 
+// UPLOAD
 async function upload() {
   try {
     const file = videoFile.files[0];
-    if (!file) return alert("Select a video");
+    if (!file) return alert("Select video");
 
     uploadBtn.disabled = true;
-    status.innerText = "Processing... ⏳";
+    status.innerText = "Processing...";
 
     const formData = new FormData();
     formData.append('video', file);
     formData.append('duration', durationInput.value);
 
-    const res = await fetch(API + '/auto-cut', {
+    await safeFetch(API + '/auto-cut', {
       method: 'POST',
       headers: { Authorization: "Bearer " + token },
       body: formData
     });
 
-    await handleResponse(res);
-
-    status.innerText = "Done ✅";
+    status.innerText = "Done!";
     loadUser();
     loadClips();
+
   } catch (err) {
     status.innerText = err.message;
   } finally {
@@ -263,27 +265,27 @@ async function upload() {
   }
 }
 
+// ANIMATION
 async function convertToAnimation() {
   try {
     const file = videoFile.files[0];
     if (!file) return alert("Select video");
 
     animBtn.disabled = true;
-    status.innerText = "Processing animation... 🎨";
+    status.innerText = "Processing...";
 
     const formData = new FormData();
     formData.append('video', file);
 
-    const res = await fetch(API + '/video-to-animation', {
+    await safeFetch(API + '/video-to-animation', {
       method: 'POST',
       headers: { Authorization: "Bearer " + token },
       body: formData
     });
 
-    await handleResponse(res);
-
-    status.innerText = "Done ✅";
+    status.innerText = "Done!";
     loadClips();
+
   } catch (err) {
     status.innerText = err.message;
   } finally {
@@ -291,46 +293,35 @@ async function convertToAnimation() {
   }
 }
 
+// LOAD CLIPS
 async function loadClips() {
   try {
-    const res = await fetch(API + '/my-clips', {
+    const data = await safeFetch(API + '/my-clips', {
       headers: { Authorization: "Bearer " + token }
     });
 
-    const clipsData = await handleResponse(res);
-
     clips.innerHTML = "";
-    clipsData.forEach(c => {
+
+    data.forEach(c => {
       clips.innerHTML += `
         <div class="clip">
           <video src="${c.file}" controls></video>
           <p class="score">🔥 Score: ${c.score}</p>
-          <button onclick="download('${c.file}')">Download</button>
         </div>
       `;
     });
+
   } catch (err) {
     console.log(err.message);
   }
 }
 
-function download(url) {
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "video.mp4";
-  a.click();
-}
-
-function copyWallet() {
-  navigator.clipboard.writeText(wallet.innerText);
-  alert("Wallet copied!");
-}
-
+// RECHARGE
 async function requestRecharge(type) {
   try {
-    paymentStatus.innerText = "Submitting... ⏳";
+    paymentStatus.innerText = "Submitting...";
 
-    const res = await fetch(API + '/request-recharge', {
+    await safeFetch(API + '/request-recharge', {
       method: 'POST',
       headers: {
         "Content-Type": "application/json",
@@ -339,20 +330,12 @@ async function requestRecharge(type) {
       body: JSON.stringify({ type })
     });
 
-    await handleResponse(res);
-    paymentStatus.innerText = "Waiting for admin approval ⏳";
+    paymentStatus.innerText = "Waiting for approval";
+
   } catch (err) {
     paymentStatus.innerText = err.message;
   }
 }
-
-const videoFile = document.getElementById("videoFile");
-const durationInput = document.getElementById("duration");
-const status = document.getElementById("status");
-const clips = document.getElementById("clips");
-const uploadBtn = document.getElementById("uploadBtn");
-const animBtn = document.getElementById("animBtn");
-const preview = document.getElementById("preview");
 </script>
 
 </body>
