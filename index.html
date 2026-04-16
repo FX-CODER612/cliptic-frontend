@@ -127,11 +127,21 @@ const preview = document.getElementById("preview");
 const userInfo = document.getElementById("userInfo");
 const paymentStatus = document.getElementById("paymentStatus");
 
-// ✅ WAKE SERVER + INIT
-window.onload = async () => {
+// 🚀 WAKE SERVER STRONG
+async function wakeServer() {
   try {
-    await fetch(API); // wake backend
+    await fetch(API);
   } catch {}
+}
+
+// 🔥 KEEP SERVER ALIVE (every 5 mins)
+setInterval(() => {
+  fetch(API).catch(() => {});
+}, 5 * 60 * 1000);
+
+// INIT
+window.onload = async () => {
+  await wakeServer();
 
   if (token) {
     showApp();
@@ -140,24 +150,31 @@ window.onload = async () => {
   }
 };
 
-// ✅ SAFE FETCH WITH RETRY
-async function safeFetch(url, options = {}, retries = 2) {
-  try {
-    const res = await fetch(url, options);
-    const data = await res.json();
+// 🔥 STRONG SAFE FETCH (handles Render delay)
+async function safeFetch(url, options = {}) {
+  let retries = 5;
 
-    if (!res.ok) throw new Error(data.error || "Request failed");
+  while (retries > 0) {
+    try {
+      const res = await fetch(url, options);
 
-    return data;
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Server issue");
+      }
 
-  } catch (err) {
-    if (retries > 0) {
+      return await res.json();
+
+    } catch (err) {
+      retries--;
+
+      status.innerText = "⏳ Connecting to server...";
+
       await new Promise(r => setTimeout(r, 3000));
-      return safeFetch(url, options, retries - 1);
     }
-
-    throw new Error("⚠️ Server slow/waking up. Try again.");
   }
+
+  throw new Error("⚠️ Server still waking up. Try again.");
 }
 
 // AUTH
@@ -180,6 +197,8 @@ async function register() {
 
 async function login() {
   try {
+    alert("⏳ Connecting... please wait");
+
     const data = await safeFetch(API + '/login', {
       method: 'POST',
       headers: { "Content-Type": "application/json" },
