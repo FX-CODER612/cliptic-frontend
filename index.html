@@ -104,8 +104,8 @@
 <div id="clips"></div>
 
 <script>
-// ✅ BACKEND URL – ALREADY SET TO YOUR RENDER SERVICE
-const API = "https://clipitic-backend-2.onrender.com";
+// ✅ BACKEND URL – CONFIRMED LIVE
+const API = "https://cliptic-backend-2.onrender.com";
 
 let token = localStorage.getItem("token") || "";
 
@@ -126,11 +126,11 @@ const uploadBox = document.getElementById("uploadBox");
 const userBox = document.getElementById("userBox");
 const rechargeBox = document.getElementById("rechargeBox");
 
-// Keep server warm (Render free tier sleeps after inactivity)
+// Wake server on load (optional – helps reduce first request delay)
 async function wakeServer() {
   try { await fetch(API); } catch {}
 }
-setInterval(() => fetch(API).catch(() => {}), 4 * 60 * 1000); // every 4 minutes
+setInterval(() => fetch(API).catch(() => {}), 10 * 60 * 1000); // ping every 10 minutes
 
 window.onload = async () => {
   await wakeServer();
@@ -141,12 +141,14 @@ window.onload = async () => {
   }
 };
 
-// Enhanced fetch with retry for cold starts
+// 🔄 Enhanced fetch with extended retries for Render cold starts
 async function safeFetch(url, options = {}) {
-  let retries = 5;
+  const maxRetries = 12;        // Up to 12 attempts
+  const baseDelay = 4000;       // 4 seconds between retries
+  
   let lastError;
   
-  while (retries > 0) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       const res = await fetch(url, options);
       if (!res.ok) {
@@ -156,14 +158,16 @@ async function safeFetch(url, options = {}) {
       return await res.json();
     } catch (err) {
       lastError = err;
-      retries--;
-      if (retries > 0) {
-        status.innerText = `⏳ Connecting to server... (${retries} retries left)`;
-        await new Promise(r => setTimeout(r, 2500));
+      
+      if (attempt < maxRetries) {
+        // Show user we're retrying
+        status.innerText = `⏳ Waking up server... (attempt ${attempt}/${maxRetries})`;
+        await new Promise(r => setTimeout(r, baseDelay));
       }
     }
   }
-  throw lastError || new Error("⚠️ Server still waking up. Please try again in a moment.");
+  
+  throw lastError || new Error("⚠️ Could not connect after multiple attempts. Please refresh and try again.");
 }
 
 async function register() {
@@ -172,14 +176,16 @@ async function register() {
     const password = passwordInput.value;
     if (!email || !password) return alert("Email and password required");
     
+    status.innerText = "⏳ Registering...";
     const data = await safeFetch(API + '/register', {
       method: 'POST',
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password })
     });
+    status.innerText = "";
     alert(data.message);
-    // Optionally auto-login after registration
   } catch (err) {
+    status.innerText = "";
     alert("Registration failed: " + err.message);
   }
 }
@@ -203,8 +209,8 @@ async function login() {
     await loadClips();
     status.innerText = "";
   } catch (err) {
-    alert("Login failed: " + err.message);
     status.innerText = "";
+    alert("Login failed: " + err.message);
   }
 }
 
@@ -262,13 +268,12 @@ async function upload() {
     });
     
     status.innerText = "✅ Clip created successfully!";
-    await loadUser();    // update credit display
-    await loadClips();   // show new clip
+    await loadUser();
+    await loadClips();
   } catch (err) {
     status.innerText = "❌ " + err.message;
   } finally {
     uploadBtn.disabled = false;
-    // Clear file input and preview
     videoFile.value = "";
     preview.style.display = "none";
   }
