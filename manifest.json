@@ -1,0 +1,24 @@
+{
+  "name": "Cliptic - Viral Video Clips",
+  "short_name": "Cliptic",
+  "description": "Create viral video clips in seconds with AI scoring",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#ff0050",
+  "background_color": "#0f0f0f",
+  "icons": [
+    {
+      "src": "https://via.placeholder.com/192x192.png?text=Cliptic",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://via.placeholder.com/512x512.png?text=Cliptic",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
