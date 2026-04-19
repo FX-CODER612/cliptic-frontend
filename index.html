@@ -3,6 +3,19 @@
 <head>
   <title>Cliptic</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json">
+  
+  <!-- Theme color for browser UI -->
+  <meta name="theme-color" content="#ff0050">
+  
+  <!-- iOS specific meta tags for full-screen web app -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Cliptic">
+  <link rel="apple-touch-icon" href="https://via.placeholder.com/192x192.png?text=Cliptic">
+  
   <style>
     body {
       font-family: Arial, Helvetica, sans-serif;
@@ -350,6 +363,17 @@ async function requestRecharge(type) {
   } catch (err) {
     paymentStatus.innerText = "❌ " + err.message;
   }
+}
+</script>
+
+<!-- Service Worker Registration for PWA -->
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then(reg => console.log('✅ Service Worker registered', reg.scope))
+      .catch(err => console.log('❌ Service Worker failed', err));
+  });
 }
 </script>
 
