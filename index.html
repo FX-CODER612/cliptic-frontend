@@ -4,12 +4,13 @@
   <title>Cliptic</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    /* Same styles as before – keep them */
     body {
-      font-family: Arial;
+      font-family: Arial, Helvetica, sans-serif;
       background: #0f0f0f;
       color: white;
       text-align: center;
+      margin: 0;
+      padding: 10px;
     }
     h1 { margin-top: 20px; color: #ff0050; }
     input, button {
@@ -19,20 +20,24 @@
       border: none;
       width: 90%;
       max-width: 300px;
+      font-size: 16px;
     }
     button {
       background: linear-gradient(45deg, #ff0050, #ff3c7d);
       color: white;
       cursor: pointer;
       font-weight: bold;
+      transition: opacity 0.2s;
     }
-    button:disabled { background: gray; }
+    button:hover { opacity: 0.9; }
+    button:disabled { background: #555; cursor: not-allowed; }
     video {
       width: 100%;
       max-width: 250px;
       height: 450px;
       object-fit: cover;
       border-radius: 12px;
+      margin: 10px 0;
     }
     .clip {
       display: inline-block;
@@ -41,17 +46,24 @@
       padding: 10px;
       border-radius: 12px;
       width: 260px;
+      vertical-align: top;
     }
-    .score { color: #00ffcc; font-weight: bold; }
+    .score { color: #00ffcc; font-weight: bold; font-size: 18px; }
     .box {
       margin: 15px auto;
-      padding: 15px;
+      padding: 20px;
       background: #1c1c1c;
-      border-radius: 12px;
+      border-radius: 16px;
       width: 90%;
       max-width: 400px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
     }
-    .btn-secondary { background: #222; }
+    .btn-secondary { background: #2a2a2a; }
+    #status, #paymentStatus {
+      margin-top: 10px;
+      font-size: 14px;
+      color: #aaa;
+    }
   </style>
 </head>
 <body>
@@ -64,8 +76,8 @@
 </div>
 
 <div id="authBox" class="box">
-  <input id="email" placeholder="Email">
-  <input id="password" placeholder="Password" type="password"><br>
+  <input id="email" type="email" placeholder="Email" autocomplete="email">
+  <input id="password" type="password" placeholder="Password" autocomplete="current-password"><br>
   <button onclick="register()">Register</button>
   <button onclick="login()">Login</button>
 </div>
@@ -74,7 +86,7 @@
   <h2>🎬 Create Clips</h2>
   <input type="file" id="videoFile" accept="video/*" onchange="previewVideo()"><br>
   <video id="preview" controls style="display:none;"></video><br>
-  Duration (seconds):
+  <label>Duration (seconds):</label>
   <input id="duration" type="number" value="10" min="1" max="60"><br>
   <button id="uploadBtn" onclick="upload()">⚡ Generate Clips</button>
   <button id="animBtn" class="btn-secondary" onclick="convertToAnimation()">🎨 Animation</button>
@@ -92,8 +104,8 @@
 <div id="clips"></div>
 
 <script>
-// 🔧 CHANGE THIS TO YOUR RENDER BACKEND URL AFTER DEPLOYMENT
-const API = "https://clipitic-backend-2.onrender.com"; // <-- UPDATE ME
+// ✅ BACKEND URL – ALREADY SET TO YOUR RENDER SERVICE
+const API = "https://clipitic-backend-2.onrender.com";
 
 let token = localStorage.getItem("token") || "";
 
@@ -114,11 +126,11 @@ const uploadBox = document.getElementById("uploadBox");
 const userBox = document.getElementById("userBox");
 const rechargeBox = document.getElementById("rechargeBox");
 
-// Wake up server on load
+// Keep server warm (Render free tier sleeps after inactivity)
 async function wakeServer() {
   try { await fetch(API); } catch {}
 }
-setInterval(() => fetch(API).catch(() => {}), 5 * 60 * 1000);
+setInterval(() => fetch(API).catch(() => {}), 4 * 60 * 1000); // every 4 minutes
 
 window.onload = async () => {
   await wakeServer();
@@ -129,8 +141,11 @@ window.onload = async () => {
   }
 };
 
+// Enhanced fetch with retry for cold starts
 async function safeFetch(url, options = {}) {
   let retries = 5;
+  let lastError;
+  
   while (retries > 0) {
     try {
       const res = await fetch(url, options);
@@ -140,43 +155,55 @@ async function safeFetch(url, options = {}) {
       }
       return await res.json();
     } catch (err) {
+      lastError = err;
       retries--;
-      status.innerText = `⏳ Connecting... (${retries} retries left)`;
-      await new Promise(r => setTimeout(r, 3000));
+      if (retries > 0) {
+        status.innerText = `⏳ Connecting to server... (${retries} retries left)`;
+        await new Promise(r => setTimeout(r, 2500));
+      }
     }
   }
-  throw new Error("⚠️ Server still waking up. Please try again in a moment.");
+  throw lastError || new Error("⚠️ Server still waking up. Please try again in a moment.");
 }
 
 async function register() {
   try {
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
+    if (!email || !password) return alert("Email and password required");
+    
     const data = await safeFetch(API + '/register', {
       method: 'POST',
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: emailInput.value, password: passwordInput.value })
+      body: JSON.stringify({ email, password })
     });
     alert(data.message);
+    // Optionally auto-login after registration
   } catch (err) {
-    alert(err.message);
+    alert("Registration failed: " + err.message);
   }
 }
 
 async function login() {
   try {
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
+    if (!email || !password) return alert("Email and password required");
+    
     status.innerText = "⏳ Logging in...";
     const data = await safeFetch(API + '/login', {
       method: 'POST',
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: emailInput.value, password: passwordInput.value })
+      body: JSON.stringify({ email, password })
     });
     token = data.token;
     localStorage.setItem("token", token);
     showApp();
-    loadUser();
-    loadClips();
+    await loadUser();
+    await loadClips();
     status.innerText = "";
   } catch (err) {
-    alert(err.message);
+    alert("Login failed: " + err.message);
     status.innerText = "";
   }
 }
@@ -203,7 +230,8 @@ async function loadUser() {
       💰 Credits: ${user.credits}<br>
       🚀 Plan: ${user.plan}
     `;
-  } catch {
+  } catch (err) {
+    console.error("Failed to load user:", err);
     logout();
   }
 }
@@ -218,47 +246,60 @@ function previewVideo() {
 async function upload() {
   try {
     const file = videoFile.files[0];
-    if (!file) return alert("Select a video");
+    if (!file) return alert("Select a video file");
+    
     uploadBtn.disabled = true;
-    status.innerText = "Processing video...";
+    status.innerText = "Processing video... (this may take a minute)";
+    
     const formData = new FormData();
     formData.append('video', file);
-    formData.append('duration', durationInput.value);
+    formData.append('duration', durationInput.value || "10");
+    
     await safeFetch(API + '/auto-cut', {
       method: 'POST',
       headers: { Authorization: "Bearer " + token },
       body: formData
     });
-    status.innerText = "✅ Clip created!";
-    loadUser();
-    loadClips();
+    
+    status.innerText = "✅ Clip created successfully!";
+    await loadUser();    // update credit display
+    await loadClips();   // show new clip
   } catch (err) {
     status.innerText = "❌ " + err.message;
   } finally {
     uploadBtn.disabled = false;
+    // Clear file input and preview
+    videoFile.value = "";
+    preview.style.display = "none";
   }
 }
 
 async function convertToAnimation() {
   try {
     const file = videoFile.files[0];
-    if (!file) return alert("Select a video");
+    if (!file) return alert("Select a video file");
+    
     animBtn.disabled = true;
     status.innerText = "Converting to animation...";
+    
     const formData = new FormData();
     formData.append('video', file);
+    
     await safeFetch(API + '/video-to-animation', {
       method: 'POST',
       headers: { Authorization: "Bearer " + token },
       body: formData
     });
+    
     status.innerText = "✅ Animation created!";
-    loadClips();
-    loadUser();
+    await loadClips();
+    await loadUser();
   } catch (err) {
     status.innerText = "❌ " + err.message;
   } finally {
     animBtn.disabled = false;
+    videoFile.value = "";
+    preview.style.display = "none";
   }
 }
 
@@ -267,17 +308,25 @@ async function loadClips() {
     const data = await safeFetch(API + '/my-clips', {
       headers: { Authorization: "Bearer " + token }
     });
+    
     clips.innerHTML = "";
+    if (data.length === 0) {
+      clips.innerHTML = "<p>No clips yet. Upload a video to get started!</p>";
+      return;
+    }
+    
     data.forEach(c => {
-      clips.innerHTML += `
-        <div class="clip">
-          <video src="${c.file}" controls></video>
-          <p class="score">🔥 Score: ${c.score}</p>
-        </div>
+      const clipDiv = document.createElement('div');
+      clipDiv.className = 'clip';
+      clipDiv.innerHTML = `
+        <video src="${c.file}" controls preload="metadata"></video>
+        <p class="score">🔥 Score: ${c.score}</p>
       `;
+      clips.appendChild(clipDiv);
     });
   } catch (err) {
-    console.error(err);
+    console.error("Failed to load clips:", err);
+    clips.innerHTML = "<p>Could not load clips. Please refresh.</p>";
   }
 }
 
@@ -292,7 +341,7 @@ async function requestRecharge(type) {
       },
       body: JSON.stringify({ type })
     });
-    paymentStatus.innerText = "✅ Request sent! Admin will review.";
+    paymentStatus.innerText = "✅ Request sent! Admin will review shortly.";
   } catch (err) {
     paymentStatus.innerText = "❌ " + err.message;
   }
