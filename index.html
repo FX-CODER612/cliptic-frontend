@@ -3,17 +3,15 @@
 <head>
   <title>Cliptic</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
   <style>
+    /* Same styles as before – keep them */
     body {
       font-family: Arial;
       background: #0f0f0f;
       color: white;
       text-align: center;
     }
-
     h1 { margin-top: 20px; color: #ff0050; }
-
     input, button {
       padding: 12px;
       margin: 6px;
@@ -22,16 +20,13 @@
       width: 90%;
       max-width: 300px;
     }
-
     button {
       background: linear-gradient(45deg, #ff0050, #ff3c7d);
       color: white;
       cursor: pointer;
       font-weight: bold;
     }
-
     button:disabled { background: gray; }
-
     video {
       width: 100%;
       max-width: 250px;
@@ -39,7 +34,6 @@
       object-fit: cover;
       border-radius: 12px;
     }
-
     .clip {
       display: inline-block;
       margin: 10px;
@@ -48,9 +42,7 @@
       border-radius: 12px;
       width: 260px;
     }
-
     .score { color: #00ffcc; font-weight: bold; }
-
     .box {
       margin: 15px auto;
       padding: 15px;
@@ -59,11 +51,9 @@
       width: 90%;
       max-width: 400px;
     }
-
     .btn-secondary { background: #222; }
   </style>
 </head>
-
 <body>
 
 <h1>🚀 CLIPTIC</h1>
@@ -82,27 +72,19 @@
 
 <div id="uploadBox" class="box" style="display:none;">
   <h2>🎬 Create Clips</h2>
-
-  <input type="file" id="videoFile" onchange="previewVideo()"><br>
-
-  <video id="preview" controls style="display:none;"></video>
-
-  <br>
-  Duration:
-  <input id="duration" value="10"><br>
-
+  <input type="file" id="videoFile" accept="video/*" onchange="previewVideo()"><br>
+  <video id="preview" controls style="display:none;"></video><br>
+  Duration (seconds):
+  <input id="duration" type="number" value="10" min="1" max="60"><br>
   <button id="uploadBtn" onclick="upload()">⚡ Generate Clips</button>
   <button id="animBtn" class="btn-secondary" onclick="convertToAnimation()">🎨 Animation</button>
-
   <p id="status"></p>
 </div>
 
 <div id="rechargeBox" class="box" style="display:none;">
   <h2>💳 Upgrade</h2>
-
   <button onclick="requestRecharge('bank')">Bank Payment</button>
   <button onclick="requestRecharge('crypto')">Crypto Payment</button>
-
   <p id="paymentStatus"></p>
 </div>
 
@@ -110,11 +92,12 @@
 <div id="clips"></div>
 
 <script>
-const API = "https://cliptic-backend.onrender.com";
+// 🔧 CHANGE THIS TO YOUR RENDER BACKEND URL AFTER DEPLOYMENT
+const API = "https://cliptic-backend.onrender.com";  // <-- UPDATE ME
 
 let token = localStorage.getItem("token") || "";
 
-// ELEMENTS
+// DOM elements
 const emailInput = document.getElementById("email");
 const passwordInput = document.getElementById("password");
 const videoFile = document.getElementById("videoFile");
@@ -126,23 +109,19 @@ const animBtn = document.getElementById("animBtn");
 const preview = document.getElementById("preview");
 const userInfo = document.getElementById("userInfo");
 const paymentStatus = document.getElementById("paymentStatus");
+const authBox = document.getElementById("authBox");
+const uploadBox = document.getElementById("uploadBox");
+const userBox = document.getElementById("userBox");
+const rechargeBox = document.getElementById("rechargeBox");
 
-// 🚀 WAKE SERVER STRONG
+// Wake up server on load
 async function wakeServer() {
-  try {
-    await fetch(API);
-  } catch {}
+  try { await fetch(API); } catch {}
 }
+setInterval(() => fetch(API).catch(() => {}), 5 * 60 * 1000);
 
-// 🔥 KEEP SERVER ALIVE (every 5 mins)
-setInterval(() => {
-  fetch(API).catch(() => {});
-}, 5 * 60 * 1000);
-
-// INIT
 window.onload = async () => {
   await wakeServer();
-
   if (token) {
     showApp();
     loadUser();
@@ -150,45 +129,32 @@ window.onload = async () => {
   }
 };
 
-// 🔥 STRONG SAFE FETCH (handles Render delay)
 async function safeFetch(url, options = {}) {
   let retries = 5;
-
   while (retries > 0) {
     try {
       const res = await fetch(url, options);
-
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Server issue");
+        throw new Error(data.error || `Request failed (${res.status})`);
       }
-
       return await res.json();
-
     } catch (err) {
       retries--;
-
-      status.innerText = "⏳ Connecting to server...";
-
+      status.innerText = `⏳ Connecting... (${retries} retries left)`;
       await new Promise(r => setTimeout(r, 3000));
     }
   }
-
-  throw new Error("⚠️ Server still waking up. Try again.");
+  throw new Error("⚠️ Server still waking up. Please try again in a moment.");
 }
 
-// AUTH
 async function register() {
   try {
     const data = await safeFetch(API + '/register', {
       method: 'POST',
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: emailInput.value,
-        password: passwordInput.value
-      })
+      body: JSON.stringify({ email: emailInput.value, password: passwordInput.value })
     });
-
     alert(data.message);
   } catch (err) {
     alert(err.message);
@@ -197,26 +163,21 @@ async function register() {
 
 async function login() {
   try {
-    alert("⏳ Connecting... please wait");
-
+    status.innerText = "⏳ Logging in...";
     const data = await safeFetch(API + '/login', {
       method: 'POST',
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: emailInput.value,
-        password: passwordInput.value
-      })
+      body: JSON.stringify({ email: emailInput.value, password: passwordInput.value })
     });
-
     token = data.token;
     localStorage.setItem("token", token);
-
     showApp();
     loadUser();
     loadClips();
-
+    status.innerText = "";
   } catch (err) {
     alert(err.message);
+    status.innerText = "";
   }
 }
 
@@ -225,7 +186,6 @@ function logout() {
   location.reload();
 }
 
-// UI
 function showApp() {
   authBox.style.display = "none";
   uploadBox.style.display = "block";
@@ -233,13 +193,11 @@ function showApp() {
   rechargeBox.style.display = "block";
 }
 
-// USER
 async function loadUser() {
   try {
     const user = await safeFetch(API + '/me', {
       headers: { Authorization: "Bearer " + token }
     });
-
     userInfo.innerHTML = `
       📧 ${user.email}<br>
       💰 Credits: ${user.credits}<br>
@@ -250,82 +208,66 @@ async function loadUser() {
   }
 }
 
-// VIDEO PREVIEW
 function previewVideo() {
   const file = videoFile.files[0];
   if (!file) return;
-
   preview.src = URL.createObjectURL(file);
   preview.style.display = "block";
 }
 
-// UPLOAD
 async function upload() {
   try {
     const file = videoFile.files[0];
-    if (!file) return alert("Select video");
-
+    if (!file) return alert("Select a video");
     uploadBtn.disabled = true;
-    status.innerText = "Processing...";
-
+    status.innerText = "Processing video...";
     const formData = new FormData();
     formData.append('video', file);
     formData.append('duration', durationInput.value);
-
     await safeFetch(API + '/auto-cut', {
       method: 'POST',
       headers: { Authorization: "Bearer " + token },
       body: formData
     });
-
-    status.innerText = "Done!";
+    status.innerText = "✅ Clip created!";
     loadUser();
     loadClips();
-
   } catch (err) {
-    status.innerText = err.message;
+    status.innerText = "❌ " + err.message;
   } finally {
     uploadBtn.disabled = false;
   }
 }
 
-// ANIMATION
 async function convertToAnimation() {
   try {
     const file = videoFile.files[0];
-    if (!file) return alert("Select video");
-
+    if (!file) return alert("Select a video");
     animBtn.disabled = true;
-    status.innerText = "Processing...";
-
+    status.innerText = "Converting to animation...";
     const formData = new FormData();
     formData.append('video', file);
-
     await safeFetch(API + '/video-to-animation', {
       method: 'POST',
       headers: { Authorization: "Bearer " + token },
       body: formData
     });
-
-    status.innerText = "Done!";
+    status.innerText = "✅ Animation created!";
     loadClips();
-
+    loadUser();
   } catch (err) {
-    status.innerText = err.message;
+    status.innerText = "❌ " + err.message;
   } finally {
     animBtn.disabled = false;
   }
 }
 
-// LOAD CLIPS
 async function loadClips() {
   try {
     const data = await safeFetch(API + '/my-clips', {
       headers: { Authorization: "Bearer " + token }
     });
-
     clips.innerHTML = "";
-
     data.forEach(c => {
       clips.innerHTML += `
         <div class="clip">
@@ -334,17 +276,14 @@ async function loadClips() {
         </div>
       `;
     });
-
   } catch (err) {
-    console.log(err.message);
+    console.error(err);
   }
 }
 
-// RECHARGE
 async function requestRecharge(type) {
   try {
-    paymentStatus.innerText = "Submitting...";
-
+    paymentStatus.innerText = "Submitting request...";
     await safeFetch(API + '/request-recharge', {
       method: 'POST',
       headers: {
@@ -353,11 +292,9 @@ async function requestRecharge(type) {
       },
       body: JSON.stringify({ type })
     });
-
-    paymentStatus.innerText = "Waiting for approval";
-
+    paymentStatus.innerText = "✅ Request sent! Admin will review.";
   } catch (err) {
-    paymentStatus.innerText = err.message;
+    paymentStatus.innerText = "❌ " + err.message;
   }
 }
 </script>
