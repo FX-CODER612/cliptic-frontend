@@ -33,8 +33,8 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   // Skip API calls – don't cache dynamic backend requests
   if (event.request.url.includes('/api/') || 
-      event.request.url.includes('cliptic-backend-2.onrender.com') &&
-      !event.request.url.endsWith('/')) {
+      (event.request.url.includes('cliptic-backend-2.onrender.com') &&
+       !event.request.url.endsWith('/'))) {
     return;
   }
   
